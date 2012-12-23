@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/env python
 
 """
   Supernum is a pragmatic static site generator using jinja2 templates,
@@ -53,7 +53,7 @@ class Supernum(object):
 
         # Create Jinja2 environment
         self.env = Environment(loader=FileSystemLoader(templates))
-    
+
         # Load base context
         fd = open(context, 'rb')
         self.context = yaml.load(fd.read())
