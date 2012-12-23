@@ -43,7 +43,7 @@ class Supernum(object):
         'md': lambda x: markdown.markdown(x),
     }
 
-    def __init__(self, context='context.yaml', templates='templates',
+    def __init__(self, context='context.yml', templates='templates',
         index='index.html', root='root', build='build', force=False):
 
         self.index = index
