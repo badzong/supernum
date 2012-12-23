@@ -59,6 +59,9 @@ class Supernum(object):
         self.context = yaml.load(fd.read())
         fd.close()
 
+        if self.context is None:
+            self.context = {}
+
     def read(self, path):
         fd = open(path, 'rb')
         content = fd.read()
