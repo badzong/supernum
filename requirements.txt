@@ -2,3 +2,4 @@ docopt
 clint
 jinja2
 markdown
+pyyaml

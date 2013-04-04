@@ -98,9 +98,12 @@ class Supernum(object):
         context = deepcopy(self.context)
         context.update(meta)
 
-        template  = "{% extends 'base.html' %}\n"
+        filename = meta.get('template', 'page.html')
+        block = meta.get('block', 'content')
+
+        template  = "{%% extends '%s' %%}\n" % filename
         template += '\n'
-        template += '{% block content %}\n'
+        template += '{%% block %s %%}\n' % block
         template += decoder(content)
         template += '{% endblock %}'
 
