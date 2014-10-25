@@ -35,15 +35,15 @@ from docutils.core import publish_parts
 from jinja2 import Environment, PackageLoader, FileSystemLoader
 from copy import deepcopy
 
-
 class Supernum(object):
 
     decoders = {
         'rst': lambda x: publish_parts(x, writer_name='html')['html_body'],
-        'md': lambda x: markdown.markdown(x),
+        'md': lambda x: markdown.markdown(x.decode('utf-8')),
+        'html': lambda x: x.decode('utf-8'),
     }
 
-    def __init__(self, context='context.yml', templates='templates',
+    def __init__(self, context='context.yaml', templates='templates',
         index='index.html', root='root', build='build', force=False):
 
         self.index = index
