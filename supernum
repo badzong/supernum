@@ -37,6 +37,8 @@ from copy import deepcopy
 import datetime
 
 class Supernum(object):
+    default_template = 'page.html'
+    separator = '@@'
 
     decoders = {
         'rst': lambda x: publish_parts(x, writer_name='html')['html_body'],
@@ -51,6 +53,7 @@ class Supernum(object):
         self.root_dir = root
         self.build_dir = build
         self.force = force
+        self.templates = templates
 
         # Create Jinja2 environment
         self.env = Environment(loader=FileSystemLoader(templates))
@@ -94,42 +97,80 @@ class Supernum(object):
 
         os.makedirs(path)
 
-    def split_content(self, content):
-        index = content.find('\n\n')
-        meta = yaml.load(content[:index])
-        content = content[index:]
+    def create_context(self, text):
+        context = deepcopy(self.context)
+        context.update(yaml.load(text))
+	return context
 
-        return (meta, content)
+    def parse_file(self, text, decoder):
+	parts = text.split(self.separator)
+        meta = parts.pop(0)
+        blocks = []
+
+	for part in parts:
+            name = part[:part.index('\n')].strip()
+            block = decoder(part[part.index('\n'):].strip())
+            blocks.append((name, block))
+
+        context = self.create_context(meta)
+
+	return (context, blocks)
+
+    def load_template(self, context):
+ 	filename = context.get('template', self.default_template)
+
+	path = os.path.join(self.templates, filename)
+
+        fd = file(path, 'rb')
+        template = fd.read().decode('utf-8')
+        fd.close()
+
+	return template
+	
+
+    def create_template(self, extends, context, blocks):
+        template  = "{%% extends '%s' %%}\n" % extends
+
+	for block, content in blocks:
+            template += '\n'
+            template += '{%% block %s %%}\n' % block
+            template += content
+            template += '\n{% endblock %}'
+
+	return template
 
     def render(self, content, decoder):
-        meta, content = self.split_content(content)
-
-        context = deepcopy(self.context)
-        context.update(meta)
-
-        filename = meta.get('template', 'page.html')
-        block = meta.get('block', 'content')
-
-        template  = "{%% extends '%s' %%}\n" % filename
-        template += '\n'
-        template += '{%% block %s %%}\n' % block
-        template += decoder(content)
-        template += '{% endblock %}'
+        context, blocks = self.parse_file(content, decoder)
+ 	extends = context.get('template', self.default_template)
+	template = self.create_template(extends, context, blocks)
 
         return self.env.from_string(template).render(context).encode('utf-8')
+
+    def render_yaml(self, content):
+        context = self.create_context(content)
+ 	filename = context.get('template', self.default_template)
+        template = self.env.get_template(filename)
+
+        return template.render(context).encode('utf-8')
 
     def fabricate(self, src, dst):
         with indent(3, quote=colored.green('>> ')):
             puts(dst)
 
+        filetype = src.split('.')[-1]
+
         fd = file(src, 'rb')
         content = fd.read()
         fd.close()
 
-        for ending, decoder in self.decoders.items():
-            if ending == src.split('.')[-1]:
-                content = self.render(content, decoder)
-                dst = dst[:-len(ending)] + 'html'
+        if filetype == 'yaml':
+            content = self.render_yaml(content)
+            dst = dst[:-len(filetype)] + 'html'
+
+	elif filetype in self.decoders.keys():
+            decoder = self.decoders[filetype]
+            content = self.render(content, decoder)
+            dst = dst[:-len(filetype)] + 'html'
 
         self.write(dst, content)
 
