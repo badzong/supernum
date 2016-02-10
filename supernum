@@ -187,8 +187,37 @@ class Supernum(object):
                 
                 self.fabricate(src, dst)
 
+    def blog_index(self):
+        blog_dir = os.path.join(self.root_dir, 'blog')
+	posts = []
+
+	if not os.path.isdir(blog_dir):
+	    return
+
+        for base, dirs, files in os.walk(blog_dir):
+            for f in files:
+                path = os.path.join(base, f)
+                fp = open(path, 'rb')
+                content = fp.read().decode('utf-8')
+                fp.close()
+
+                href = base[len(self.root_dir):] + '/' + '.'.join(f.split('.')[:-1]) + '.html'
+		meta = yaml.load(content.split(self.separator)[0])
+
+		published = meta.get('published')
+                if published:
+                    meta['published'] = datetime.datetime.strptime(published, "%d.%m.%Y")
+                    meta['href'] = href
+		    posts.append(meta)
+
+        if len(posts):
+       	    posts = sorted(posts, key=lambda x: x['published'], reverse=True)
+
+       	self.context['blog_posts'] = posts
+
     def build(self):
         self.makedir(self.build_dir)
+	self.blog_index()
         self.walk()
 
 
