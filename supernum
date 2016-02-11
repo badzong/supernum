@@ -72,22 +72,28 @@ class Supernum(object):
         if self.context is None:
             self.context = {}
 
-	self.load_ignore_patterns()
-	self.load_globals()
+        self.load_ignore_patterns()
+        self.load_globals()
 
     def load_globals(self):
-	self.context.update({
+        self.context.update({
             'today': datetime.date.today().strftime("%Y-%m-%d"),
         })
 
     def load_ignore_patterns(self):
-	if not os.path.isfile(self.ignore):
-	    return
+        if not os.path.isfile(self.ignore):
+            return
 
-	fp = open(self.ignore, 'rb')
-	for line in fp.readlines():
-	    self.ignore_patterns.append(re.compile(line.strip(), re.IGNORECASE))
-	fp.close();
+        fp = open(self.ignore, 'rb')
+        for line in fp.readlines():
+            self.ignore_patterns.append(re.compile(line.strip(), re.IGNORECASE))
+        fp.close();
+
+    def ignore_path(self, path):
+        for r in self.ignore_patterns:
+            if r.search(os.path.basename(path)):
+                return True
+        return False
 
     def read(self, path):
         fd = open(path, 'rb')
@@ -115,65 +121,64 @@ class Supernum(object):
     def create_context(self, text):
         context = deepcopy(self.context)
         context.update(yaml.load(text))
-	return context
+        return context
 
     def parse_file(self, text, decoder):
-	parts = text.split(self.separator)
+        parts = text.split(self.separator)
         meta = parts.pop(0)
         blocks = []
 
-	for part in parts:
+        for part in parts:
             name = part[:part.index('\n')].strip()
             block = decoder(part[part.index('\n'):].strip())
             blocks.append((name, block))
 
         context = self.create_context(meta)
 
-	return (context, blocks)
+        return (context, blocks)
 
     def load_template(self, context):
- 	filename = context.get('template', self.default_template)
+        filename = context.get('template', self.default_template)
 
-	path = os.path.join(self.templates, filename)
+        path = os.path.join(self.templates, filename)
 
         fd = file(path, 'rb')
         template = fd.read().decode('utf-8')
         fd.close()
 
-	return template
-	
+        return template
+        
 
     def create_template(self, extends, context, blocks):
         template  = "{%% extends '%s' %%}\n" % extends
 
-	for block, content in blocks:
+        for block, content in blocks:
             template += '\n'
             template += '{%% block %s %%}\n' % block
             template += content
             template += '\n{% endblock %}'
 
-	return template
+        return template
 
     def render(self, content, decoder):
         context, blocks = self.parse_file(content, decoder)
- 	extends = context.get('template', self.default_template)
-	template = self.create_template(extends, context, blocks)
+        extends = context.get('template', self.default_template)
+        template = self.create_template(extends, context, blocks)
 
         return self.env.from_string(template).render(context).encode('utf-8')
 
     def render_yaml(self, content):
         context = self.create_context(content)
- 	filename = context.get('template', self.default_template)
+        filename = context.get('template', self.default_template)
         template = self.env.get_template(filename)
 
         return template.render(context).encode('utf-8')
 
     def fabricate(self, src, dst):
-        for r in self.ignore_patterns:
-            if r.search(os.path.basename(src)):
-        	with indent(3, quote=colored.red('>> ')):
-            	    puts(src)
-		return
+        if self.ignore_path(src):
+            with indent(3, quote=colored.red('>> ')):
+                puts(src)
+            return
 
         modified = False
         filetype = src.split('.')[-1]
@@ -187,16 +192,16 @@ class Supernum(object):
             dst = dst[:-len(filetype)] + 'html'
             modified = True
 
-	elif filetype in self.decoders.keys():
+        elif filetype in self.decoders.keys():
             decoder = self.decoders[filetype]
             content = self.render(content, decoder)
             dst = dst[:-len(filetype)] + 'html'
             modified = True
 
-	if modified:
+        if modified:
             with indent(3, quote=colored.green('>> ')):
                 puts(dst)
-	else:
+        else:
             with indent(3, quote=colored.cyan('>> ')):
                 puts(dst)
 
@@ -217,35 +222,37 @@ class Supernum(object):
 
     def blog_index(self):
         blog_dir = os.path.join(self.root_dir, 'blog')
-	posts = []
+        posts = []
 
-	if not os.path.isdir(blog_dir):
-	    return
+        if not os.path.isdir(blog_dir):
+            return
 
         for base, dirs, files in os.walk(blog_dir):
             for f in files:
+                if self.ignore_path(f):
+                    continue
                 path = os.path.join(base, f)
                 fp = open(path, 'rb')
                 content = fp.read().decode('utf-8')
                 fp.close()
 
                 href = base[len(self.root_dir):] + '/' + '.'.join(f.split('.')[:-1]) + '.html'
-		meta = yaml.load(content.split(self.separator)[0])
+                meta = yaml.load(content.split(self.separator)[0])
 
-		published = meta.get('published')
+                published = meta.get('published')
                 if published:
                     meta['published'] = datetime.datetime.strptime(published, "%d.%m.%Y")
                     meta['href'] = href
-		    posts.append(meta)
+                    posts.append(meta)
 
         if len(posts):
-       	    posts = sorted(posts, key=lambda x: x['published'], reverse=True)
+             posts = sorted(posts, key=lambda x: x['published'], reverse=True)
 
-       	self.context['blog_posts'] = posts
+        self.context['blog_posts'] = posts
 
     def build(self):
         self.makedir(self.build_dir)
-	self.blog_index()
+        self.blog_index()
         self.walk()
 
 
