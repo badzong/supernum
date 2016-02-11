@@ -15,6 +15,8 @@
                     Defaults to templates.
     -i <index>      Filename of the directory index file. Defaults to
                     index.html.
+    -I <ignore>     File containing filename patterns to ignore. Defaults to
+                    .ignore.
     -r <root>       Name of the folder containing the document root. Defaults to
                     root.
     -b <build>      Name of the ouput folder. Defaults to build.
@@ -26,6 +28,7 @@
 
 import os
 import sys
+import re
 from docopt import docopt
 from clint.textui import colored, puts, indent
 import yaml
@@ -39,6 +42,7 @@ import datetime
 class Supernum(object):
     default_template = 'page.html'
     separator = '@@'
+    ignore_patterns = []
 
     decoders = {
         'rst': lambda x: publish_parts(x, writer_name='html')['html_body'],
@@ -47,13 +51,15 @@ class Supernum(object):
     }
 
     def __init__(self, context='context.yaml', templates='templates',
-        index='index.html', root='root', build='build', force=False):
+        index='index.html', root='root', build='build', ignore='.ignore',
+        force=False):
 
         self.index = index
         self.root_dir = root
         self.build_dir = build
         self.force = force
         self.templates = templates
+        self.ignore = ignore
 
         # Create Jinja2 environment
         self.env = Environment(loader=FileSystemLoader(templates))
@@ -66,6 +72,7 @@ class Supernum(object):
         if self.context is None:
             self.context = {}
 
+	self.load_ignore_patterns()
 	self.load_globals()
 
     def load_globals(self):
@@ -73,6 +80,14 @@ class Supernum(object):
             'today': datetime.date.today().strftime("%Y-%m-%d"),
         })
 
+    def load_ignore_patterns(self):
+	if not os.path.isfile(self.ignore):
+	    return
+
+	fp = open(self.ignore, 'rb')
+	for line in fp.readlines():
+	    self.ignore_patterns.append(re.compile(line.strip(), re.IGNORECASE))
+	fp.close();
 
     def read(self, path):
         fd = open(path, 'rb')
@@ -154,9 +169,13 @@ class Supernum(object):
         return template.render(context).encode('utf-8')
 
     def fabricate(self, src, dst):
-        with indent(3, quote=colored.green('>> ')):
-            puts(dst)
+        for r in self.ignore_patterns:
+            if r.search(os.path.basename(src)):
+        	with indent(3, quote=colored.red('>> ')):
+            	    puts(src)
+		return
 
+        modified = False
         filetype = src.split('.')[-1]
 
         fd = file(src, 'rb')
@@ -166,11 +185,20 @@ class Supernum(object):
         if filetype == 'yaml':
             content = self.render_yaml(content)
             dst = dst[:-len(filetype)] + 'html'
+            modified = True
 
 	elif filetype in self.decoders.keys():
             decoder = self.decoders[filetype]
             content = self.render(content, decoder)
             dst = dst[:-len(filetype)] + 'html'
+            modified = True
+
+	if modified:
+            with indent(3, quote=colored.green('>> ')):
+                puts(dst)
+	else:
+            with indent(3, quote=colored.cyan('>> ')):
+                puts(dst)
 
         self.write(dst, content)
 
@@ -228,7 +256,7 @@ if __name__ == '__main__':
         os.chdir(args['<workdir>'])
 
     kwargs = {}
-    for key in ['context', 'templates', 'root', 'build']:
+    for key in ['context', 'templates', 'root', 'build', 'ignore']:
         try:
             v = args['<' + key + '>']
         except KeyError:
