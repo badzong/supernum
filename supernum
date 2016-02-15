@@ -298,7 +298,7 @@ if __name__ == '__main__':
 
     snum = Supernum(**kwargs)
 
+    snum.build()
+
     if args['-S']:
         snum.server()
-    else:
-        snum.build()
