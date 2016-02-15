@@ -42,6 +42,7 @@ from copy import deepcopy
 import datetime
 import SimpleHTTPServer
 import SocketServer
+import socket
 
 class Supernum(object):
     default_template = 'page.html'
@@ -261,9 +262,14 @@ class Supernum(object):
         self.walk()
 
     def server(self):
+        class TCPServer(SocketServer.TCPServer):
+            def server_bind(self):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.socket.bind(self.server_address)
+
         os.chdir(self.build_dir)
         Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-        httpd = SocketServer.TCPServer(("", self.port), Handler)
+        httpd = TCPServer(("", self.port), Handler)
 
         print "running on http://127.0.0.1:%s" % self.port
         try:
