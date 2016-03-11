@@ -3,7 +3,6 @@ Markdown==2.3.1
 MarkupSafe==0.18
 PyYAML==3.10
 argparse==1.2.1
-clint==0.3.1
 distribute==0.6.24
 docopt==0.6.1
 docutils==0.11

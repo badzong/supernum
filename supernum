@@ -30,7 +30,6 @@ import os
 import sys
 import re
 from docopt import docopt
-from clint.textui import colored, puts, indent
 import yaml
 import shutil
 import markdown
@@ -174,14 +173,26 @@ class Supernum(object):
 
         return template.render(context).encode('utf-8')
 
+    def colored(self, msg, color):
+        colors = {
+            'red': '\033[91m',
+            'green': '\033[92m',
+            'cyan': '\033[94m',
+        }
+        print(colors[color] + '>> ' + '\033[0m' + msg)
+
     def fabricate(self, src, dst):
+        filetype = src.split('.')[-1]
+        modify = filetype in self.decoders.keys() + ['yaml',]
+
         if self.ignore_path(src):
-            with indent(3, quote=colored.red('>> ')):
-                puts(src)
+            self.colored(src, 'red')
             return
 
-        modified = False
-        filetype = src.split('.')[-1]
+        if modify:
+            self.colored(src, 'green')
+        else:
+            self.colored(src, 'cyan')
 
         fd = file(src, 'rb')
         content = fd.read()
@@ -197,13 +208,6 @@ class Supernum(object):
             content = self.render(content, decoder)
             dst = dst[:-len(filetype)] + 'html'
             modified = True
-
-        if modified:
-            with indent(3, quote=colored.green('>> ')):
-                puts(dst)
-        else:
-            with indent(3, quote=colored.cyan('>> ')):
-                puts(dst)
 
         self.write(dst, content)
 
