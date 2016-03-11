@@ -5,7 +5,7 @@
   reStructeredText or Markdown.
 
   Usage:
-    supernum [-fh] [<workdir>] [-c <context>] [-t <templates>] [-i <index>] [-r <root>] [-b <build>]
+    supernum [-fh] [<workdir>] [-c <context>] [-t <templates>] [-i <index>] [-r <root>] [-b <build>] [-S] [-P <port>]
 
   Options:
     <workdir>       Directory where the source files can be found. Defaults to the
@@ -22,6 +22,8 @@
     -b <build>      Name of the ouput folder. Defaults to build.
     -f              Delete all contents of the build folder if exists without
                     asking.
+    -S              Run HTTP server.
+    -P <port>       HTTP port number. Default: 5000.
     -h              Print this text.
 
 """
@@ -37,6 +39,9 @@ from docutils.core import publish_parts
 from jinja2 import Environment, PackageLoader, FileSystemLoader
 from copy import deepcopy
 import datetime
+import SimpleHTTPServer
+import SocketServer
+import socket
 
 class Supernum(object):
     default_template = 'page.html'
@@ -51,7 +56,7 @@ class Supernum(object):
 
     def __init__(self, context='context.yaml', templates='templates',
         index='index.html', root='root', build='build', ignore='.ignore',
-        force=False):
+        force=False, port=5000):
 
         self.index = index
         self.root_dir = root
@@ -59,6 +64,7 @@ class Supernum(object):
         self.force = force
         self.templates = templates
         self.ignore = ignore
+        self.port = port
 
         # Create Jinja2 environment
         self.env = Environment(loader=FileSystemLoader(templates))
@@ -259,6 +265,22 @@ class Supernum(object):
         self.blog_index()
         self.walk()
 
+    def server(self):
+        class TCPServer(SocketServer.TCPServer):
+            def server_bind(self):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.socket.bind(self.server_address)
+
+        os.chdir(self.build_dir)
+        Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+        httpd = TCPServer(("", self.port), Handler)
+
+        print "running on http://127.0.0.1:%s" % self.port
+        try:
+           httpd.serve_forever()
+        except KeyboardInterrupt:
+           pass
+
 
 if __name__ == '__main__':
     args = docopt(__doc__)
@@ -267,7 +289,7 @@ if __name__ == '__main__':
         os.chdir(args['<workdir>'])
 
     kwargs = {}
-    for key in ['context', 'templates', 'root', 'build', 'ignore']:
+    for key in ['context', 'templates', 'root', 'build', 'ignore', 'port']:
         try:
             v = args['<' + key + '>']
         except KeyError:
@@ -279,4 +301,8 @@ if __name__ == '__main__':
         kwargs['force'] = True
 
     snum = Supernum(**kwargs)
+
     snum.build()
+
+    if args['-S']:
+        snum.server()
