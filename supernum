@@ -165,15 +165,19 @@ class Supernum(object):
 
         return template
 
-    def render(self, content, decoder):
+    def render(self, content, decoder, ref):
         context, blocks = self.parse_file(content, decoder)
+        context.update(ref)
+
         extends = context.get('template', self.default_template)
         template = self.create_template(extends, context, blocks)
 
         return self.env.from_string(template).render(context).encode('utf-8')
 
-    def render_yaml(self, content):
+    def render_yaml(self, content, ref):
         context = self.create_context(content)
+        context.update(ref)
+
         filename = context.get('template', self.default_template)
         template = self.env.get_template(filename)
 
@@ -187,7 +191,18 @@ class Supernum(object):
         }
         print(colors[color] + '>> ' + '\033[0m' + msg)
 
-    def fabricate(self, src, dst):
+    def create_ref(self, base, dst):
+        filename = os.path.basename(dst)
+        path = os.path.join(base, filename)
+        slug = '-'.join(filename.split('.')[:-1]).lower()
+
+        return {
+            'filename': filename,
+            'path': path,
+            'slug': slug,
+        }
+
+    def fabricate(self, src, dst, path):
         filetype = src.split('.')[-1]
         modify = filetype in self.decoders.keys() + ['yaml',]
 
@@ -205,21 +220,24 @@ class Supernum(object):
         fd.close()
 
         if filetype == 'yaml':
-            content = self.render_yaml(content)
             dst = dst[:-len(filetype)] + 'html'
+            ref = self.create_ref(path, dst)
+            content = self.render_yaml(content, ref)
             modified = True
 
         elif filetype in self.decoders.keys():
-            decoder = self.decoders[filetype]
-            content = self.render(content, decoder)
             dst = dst[:-len(filetype)] + 'html'
+            ref = self.create_ref(path, dst)
+            decoder = self.decoders[filetype]
+            content = self.render(content, decoder, ref)
             modified = True
 
         self.write(dst, content)
 
     def walk(self):
         for base, dirs, files in os.walk(self.root_dir):
-            output = self.build_dir + base[len(self.root_dir):]
+            path = base[len(self.root_dir):]
+            output = self.build_dir + path
 
             for d in dirs:
                 self.makedir(os.path.join(output, d))
@@ -228,7 +246,7 @@ class Supernum(object):
                 src = os.path.join(base, f)
                 dst = os.path.join(output, f)
                 
-                self.fabricate(src, dst)
+                self.fabricate(src, dst, path)
 
     def blog_index(self):
         blog_dir = os.path.join(self.root_dir, 'blog')
