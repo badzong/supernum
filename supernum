@@ -42,11 +42,13 @@ import datetime
 import SimpleHTTPServer
 import SocketServer
 import socket
+import gzip
 
 class Supernum(object):
     default_template = 'page.html'
     separator = '@@'
     ignore_patterns = []
+    urls = []
 
     decoders = {
         'rst': lambda x: publish_parts(x, writer_name='html')['html_body'],
@@ -205,6 +207,7 @@ class Supernum(object):
     def fabricate(self, src, dst, path):
         filetype = src.split('.')[-1]
         modify = filetype in self.decoders.keys() + ['yaml',]
+        ref = None
 
         if self.ignore_path(src):
             self.colored(src, 'red')
@@ -231,6 +234,18 @@ class Supernum(object):
             decoder = self.decoders[filetype]
             content = self.render(content, decoder, ref)
             modified = True
+
+        # self.urls are used to create sitemap.xml
+        if ref:
+            if ref['path'][0] == '/':
+	        url = ref['path']
+            else:
+	        url = '/' + ref['path']
+
+            if url.split('/')[-1] == 'index.html':
+                url = '/'.join(url.split('/')[:-1])
+
+            self.urls.append(self.context['hostname'] + url)
 
         self.write(dst, content)
 
@@ -278,10 +293,26 @@ class Supernum(object):
 
         self.context['blog_posts'] = posts
 
+    def sitemap(self):
+        path = os.path.join(self.build_dir, 'sitemap.xml.gz')
+        self.colored(path, 'red')
+
+        lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        ] + ['  <url><loc>' + x + '</loc></url>' for x in self.urls] + [
+            '</urlset>',
+        ]
+        content = '\n'.join(lines)
+
+        with gzip.open(path, 'wb') as f:
+            f.write(content)
+
     def build(self):
         self.makedir(self.build_dir)
         self.blog_index()
         self.walk()
+        self.sitemap()
 
     def server(self):
         class TCPServer(SocketServer.TCPServer):
