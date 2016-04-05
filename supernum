@@ -45,10 +45,12 @@ import socket
 import gzip
 
 class Supernum(object):
+    feed_len = 10
     default_template = 'page.html'
     separator = '@@'
     ignore_patterns = []
     urls = []
+    blog_posts = None
 
     decoders = {
         'rst': lambda x: publish_parts(x, writer_name='html')['html_body'],
@@ -189,6 +191,7 @@ class Supernum(object):
         colors = {
             'red': '\033[91m',
             'green': '\033[92m',
+            'yellow': '\033[93m',
             'cyan': '\033[94m',
         }
         print(colors[color] + '>> ' + '\033[0m' + msg)
@@ -291,11 +294,12 @@ class Supernum(object):
         if len(posts):
              posts = sorted(posts, key=lambda x: x['published'], reverse=True)
 
+        self.blog_posts = posts
         self.context['blog_posts'] = posts
 
     def sitemap(self):
         path = os.path.join(self.build_dir, 'sitemap.xml.gz')
-        self.colored(path, 'red')
+        self.colored(path, 'yellow')
 
         lines = [
             '<?xml version="1.0" encoding="UTF-8"?>',
@@ -308,11 +312,56 @@ class Supernum(object):
         with gzip.open(path, 'wb') as f:
             f.write(content)
 
+    def feed(self):
+        rss = self.context.get('rss')
+        path = os.path.join(self.build_dir, 'feed.xml')
+
+        if not rss:
+            self.colored(path, 'red')
+            return
+
+        self.colored(path, 'yellow')
+
+        lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+            '  <channel>',
+            '    <atom:link href="' + self.context['hostname'] + '/feed.xml" rel="self" type="application/rss+xml" />',
+            '    <title>' + rss['title'] + '</title>',
+            '    <link>' + rss['link'] + '</link>',
+            '    <description>' + rss['description'] + '</description>',
+        ]
+
+        for post in self.blog_posts[:self.feed_len]:
+            if not post.get('published'):
+                continue
+
+            lines += [
+                '    <item>',
+                '      <title>' + post['title'] + '</title>',
+                '      <link>' + self.context['hostname'] + post['href'] + '</link>',
+                '      <guid>' + self.context['hostname'] + post['href'] + '</guid>',
+                '      <description>' + post['description'] + '</description>',
+                '    </item>',
+            ]
+
+        lines += [
+            '  </channel>',
+            '</rss>',
+        ]
+
+        content = '\n'.join(lines).encode('utf-8')
+
+        f = open(path, 'w')
+        f.write(content)
+        f.close()
+
     def build(self):
         self.makedir(self.build_dir)
         self.blog_index()
         self.walk()
         self.sitemap()
+        self.feed()
 
     def server(self):
         class TCPServer(SocketServer.TCPServer):
