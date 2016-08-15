@@ -86,6 +86,7 @@ class Supernum(object):
 
     def load_globals(self):
         self.context.update({
+            'now': datetime.datetime.now(),
             'today': datetime.date.today().strftime("%Y-%m-%d"),
         })
 
@@ -248,7 +249,8 @@ class Supernum(object):
             if url.split('/')[-1] == 'index.html':
                 url = '/'.join(url.split('/')[:-1])
 
-            self.urls.append(self.context['hostname'] + url)
+            if url not in self.context.get('sitemap_hidden', []):
+               self.urls.append(self.context['hostname'] + url)
 
         self.write(dst, content)
 
