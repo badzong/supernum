@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """
   Supernum is a pragmatic static site generator using jinja2 templates,
@@ -44,6 +45,9 @@ import SocketServer
 import socket
 import gzip
 
+def regex_replace(s, find, replace):
+    return re.sub(find, replace, s)
+
 class Supernum(object):
     feed_len = 10
     default_template = 'page.html'
@@ -72,6 +76,7 @@ class Supernum(object):
 
         # Create Jinja2 environment
         self.env = Environment(loader=FileSystemLoader(templates))
+        self.env.filters['regex_replace'] = regex_replace
 
         # Load base context
         fd = open(context, 'rb')

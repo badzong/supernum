@@ -1,5 +1,18 @@
-supernum
-========
+# supernum
 
-Another static site generator built on top of jinja2 templates and
-reStructeredText or markdown.
+Pragmatic Websites with templates.
+
+## Get started
+
+Create a simple directory structure for the new static website.
+
+mkdir website
+mkdir website/root
+mkdir website/templates
+
+
+
+
+
+
+
