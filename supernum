@@ -43,6 +43,15 @@ import SimpleHTTPServer
 import SocketServer
 import socket
 import gzip
+import json
+import pprint
+
+def regex_replace(s, find, replace):
+    return re.sub(find, replace, s)
+
+def pretty_print(x):
+    return json.dumps(x, indent=1)
+
 
 class Supernum(object):
     feed_len = 10
@@ -72,6 +81,8 @@ class Supernum(object):
 
         # Create Jinja2 environment
         self.env = Environment(loader=FileSystemLoader(templates))
+        self.env.filters['regex_replace'] = regex_replace
+        self.env.filters['pprint'] = pretty_print
 
         # Load base context
         fd = open(context, 'rb')
@@ -176,6 +187,8 @@ class Supernum(object):
 
         extends = context.get('template', self.default_template)
         template = self.create_template(extends, context, blocks)
+
+        #pprint.pprint(context)
 
         return self.env.from_string(template).render(context).encode('utf-8')
 
